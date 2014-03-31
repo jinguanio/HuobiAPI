@@ -46,6 +46,10 @@ namespace HuobiAPI.Test
                 Console.WriteLine(_ex.Code);
                 Console.WriteLine(_ex.Text);
             }
+            catch (Exception _ex)
+            {
+                Console.WriteLine(_ex.Message);
+            }
 
 
             Console.ReadLine();
