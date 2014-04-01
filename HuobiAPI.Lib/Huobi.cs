@@ -7,6 +7,9 @@ using Newtonsoft.Json.Linq;
 
 namespace HuobiAPI.Lib
 {
+    public enum MarketType { BTC, LTC }
+    public enum MarketPeriod { M1, M5, M15, M30, M60, D, W, M, Y }
+
     public class Huobi
     {
         private string key, secret;
@@ -20,6 +23,33 @@ namespace HuobiAPI.Lib
             this.timezone = _timezone;
         }
 
+        #region 行情API
+        public static void KLine(MarketType _type, MarketPeriod _period)
+        {
+            string _url = "";
+            switch(_type)
+            {
+                case MarketType.BTC: _url = "https://market.huobi.com/staticmarket/kline{0}.html"; break;
+                case MarketType.LTC: _url = "https://market.huobi.com/staticmarket/kline_ltc{0}.html"; break;
+            }
+            switch(_period)
+            {
+                case MarketPeriod.M1: _url = string.Format(_url, "001"); break;
+                case MarketPeriod.M5: _url = string.Format(_url, "005"); break;
+                case MarketPeriod.M15: _url = string.Format(_url, "015"); break;
+                case MarketPeriod.M30: _url = string.Format(_url, "030"); break;
+                case MarketPeriod.M60: _url = string.Format(_url, "060"); break;
+                case MarketPeriod.D: _url = string.Format(_url, "100"); break;
+                case MarketPeriod.W: _url = string.Format(_url, "200"); break;
+                case MarketPeriod.M: _url = string.Format(_url, "300"); break;
+                case MarketPeriod.Y: _url = string.Format(_url, "400"); break;
+            }
+
+
+        }
+        #endregion
+
+        #region 交易API
         #region GetAccount
         public Account GetAccount()
         {
@@ -183,6 +213,7 @@ namespace HuobiAPI.Lib
 
             return _json;
         }
+        #endregion
         #endregion
     }
 }
