@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
@@ -24,15 +25,16 @@ namespace HuobiAPI.Lib
         }
 
         #region 行情API
-        public static void KLine(MarketType _type, MarketPeriod _period)
+        #region GetKLine
+        public static KLine[] GetKLine(MarketType _type, MarketPeriod _period)
         {
             string _url = "";
-            switch(_type)
+            switch (_type)
             {
                 case MarketType.BTC: _url = "https://market.huobi.com/staticmarket/kline{0}.html"; break;
                 case MarketType.LTC: _url = "https://market.huobi.com/staticmarket/kline_ltc{0}.html"; break;
             }
-            switch(_period)
+            switch (_period)
             {
                 case MarketPeriod.M1: _url = string.Format(_url, "001"); break;
                 case MarketPeriod.M5: _url = string.Format(_url, "005"); break;
@@ -45,8 +47,170 @@ namespace HuobiAPI.Lib
                 case MarketPeriod.Y: _url = string.Format(_url, "400"); break;
             }
 
-
+            string _result = Get(_url);
+            IList<KLine> _klines = new List<KLine>();
+            string[] _lines = _result.Split('\n');
+            foreach (string _line in _lines)
+            {
+                string[] _item = _line.Replace("\r", "").Split(',');
+                if (_item.Length != 8) { continue; }
+                KLine _kline = new KLine();
+                _kline.DateTime = DateTime.Parse(string.Format("{0}-{1}-{2} {3}:{4}:{5}",
+                    _item[0].Substring(0,4),
+                    _item[0].Substring(4,2),
+                    _item[0].Substring(6,2),
+                    _item[1].Substring(0,2),
+                    _item[1].Substring(2,2),
+                    _item[1].Substring(4,2)));
+                _kline.Open = decimal.Parse(_item[2]);
+                _kline.High = decimal.Parse(_item[3]);
+                _kline.Low = decimal.Parse(_item[4]);
+                _kline.Close = decimal.Parse(_item[5]);
+                _kline.Volume = decimal.Parse(_item[6]);
+                _kline.Total = decimal.Parse(_item[7]);
+                _klines.Add(_kline);
+            }
+            return _klines.ToArray();
         }
+        #endregion
+
+        #region GetLine
+        public static Line[] GetLine(MarketType _type, out decimal _middlePrice)
+        {
+            string _url = "";
+            switch (_type)
+            {
+                case MarketType.BTC: _url = "https://market.huobi.com/staticmarket/td.html"; break;
+                case MarketType.LTC: _url = "https://market.huobi.com/staticmarket/td_ltc.html"; break;
+            }
+
+            decimal _output = 0M;
+            string _result = Get(_url);
+            IList<Line> _tlines = new List<Line>();
+            string[] _lines = _result.Split('\n');
+            foreach (string _line in _lines)
+            {
+                string[] _item = _line.Replace("\r", "").Split(',');
+                if (_item.Length == 1)
+                {
+                    decimal _current = 0M;
+                    if (decimal.TryParse(_item[0], out _current)) { _output = _current; }
+                    continue;
+                }
+                else if (_item.Length != 4)
+                {
+                    continue;
+                }
+
+                Line _tline = new Line();
+                _tline.Time = _item[0];
+                _tline.Price = decimal.Parse(_item[1]);
+                _tline.Volume = decimal.Parse(_item[2]);
+                _tline.Total = decimal.Parse(_item[3]);
+                _tlines.Add(_tline);
+            }
+
+            _middlePrice = _output;
+            return _tlines.ToArray();
+        }
+        #endregion
+
+        #region GetTrades
+        public static Market GetTrades(MarketType _type)
+        {
+            string _url = "";
+            switch (_type)
+            {
+                case MarketType.BTC: _url = "https://market.huobi.com/staticmarket/detail.html"; break;
+                case MarketType.LTC: _url = "https://market.huobi.com/staticmarket/detail_ltc.html"; break;
+            }
+
+            string _result = "";
+            JObject _json;
+
+            while(true)
+            {
+                _result = Get(_url);
+                _result = _result.Replace("view_detail(", "");
+                _result = _result.Substring(0, _result.LastIndexOf("}") + 1);
+                try
+                {
+                    _json = JObject.Parse(_result);
+                    break;
+                }
+                catch
+                {
+                    Thread.Sleep(1000);
+                }
+            }
+
+            Market _market = new Market();
+            _market.New = _json["p_new"].Value<decimal>();
+            _market.Open = _json["p_open"].Value<decimal>();
+            _market.Close = _json["p_last"].Value<decimal>();
+            _market.High = _json["p_high"].Value<decimal>();
+            _market.Low = _json["p_low"].Value<decimal>();
+            _market.Level = _json["level"].Value<decimal>();
+            _market.Volume = _json["amount"].Value<decimal>();
+            _market.Total = _json["total"].Value<decimal>();
+            _market.AMP = _json["amp"].Value<decimal>();
+
+            _market.Buys = new MarketTrade[_json["buys"].Count()];
+            for (int i = 0; i < _market.Buys.Length; i++)
+            {
+                MarketTrade _trade = new MarketTrade();
+                _trade.Price = _json["buys"][i]["price"].Value<decimal>();
+                _trade.Level = _json["buys"][i]["level"].Value<decimal>();
+                _trade.Volume = _json["buys"][i]["amount"].Value<decimal>();
+                _market.Buys[i] = _trade;
+            }
+
+            _market.Sells = new MarketTrade[_json["sells"].Count()];
+            for (int i = 0; i < _market.Sells.Length; i++)
+            {
+                MarketTrade _trade = new MarketTrade();
+                _trade.Price = _json["sells"][i]["price"].Value<decimal>();
+                _trade.Level = _json["sells"][i]["level"].Value<decimal>();
+                _trade.Volume = _json["sells"][i]["amount"].Value<decimal>();
+                _market.Sells[i] = _trade;
+            }
+
+            _market.TopBuys = new MarketTrade5[_json["top_buy"].Count()];
+            for (int i = 0; i < _market.TopBuys.Length; i++)
+            {
+                MarketTrade5 _trade = new MarketTrade5();
+                _trade.Price = _json["top_buy"][i]["price"].Value<decimal>();
+                _trade.Level = _json["top_buy"][i]["level"].Value<decimal>();
+                _trade.Volume = _json["top_buy"][i]["amount"].Value<decimal>();
+                _trade.ACCU = _json["top_buy"][i]["accu"].Value<decimal>();
+                _market.TopBuys[i] = _trade;
+            }
+
+            _market.TopSells = new MarketTrade5[_json["top_sell"].Count()];
+            for (int i = 0; i < _market.TopSells.Length; i++)
+            {
+                MarketTrade5 _trade = new MarketTrade5();
+                _trade.Price = _json["top_sell"][i]["price"].Value<decimal>();
+                _trade.Level = _json["top_sell"][i]["level"].Value<decimal>();
+                _trade.Volume = _json["top_sell"][i]["amount"].Value<decimal>();
+                _trade.ACCU = _json["top_sell"][i]["accu"].Value<decimal>();
+                _market.TopSells[i] = _trade;
+            }
+
+            _market.Trades = new MarketTraded[_json["trades"].Count()];
+            for (int i = 0; i < _market.Trades.Length; i++)
+            {
+                MarketTraded _trade = new MarketTraded();
+                _trade.Time = _json["trades"][i]["time"].Value<string>();
+                _trade.Price = _json["trades"][i]["price"].Value<decimal>();
+                _trade.Volume = _json["trades"][i]["amount"].Value<decimal>();
+                _trade.Type = _json["trades"][i]["type"].Value<string>();
+                _market.Trades[i] = _trade;
+            }
+
+            return _market;
+        }
+        #endregion
         #endregion
 
         #region 交易API
@@ -184,6 +348,18 @@ namespace HuobiAPI.Lib
             return (int)(DateTime.UtcNow - DateTime.Parse("1970-1-1 0:0:0.0")).TotalSeconds;
         }
         #endregion
+        #endregion
+
+        #region Get
+        private static string Get(string _url, int _timeout = 5000)
+        {
+            WebClientPlus _webClient = new WebClientPlus(_timeout);
+            string _result = _webClient.DownloadString(_url);
+            _webClient.Dispose();
+
+            return _result;
+        }
+        #endregion
 
         #region Post
         private JObject Post(Dictionary<string, string> _params)
@@ -195,7 +371,7 @@ namespace HuobiAPI.Lib
                 _data += _param.Key + "=" + _param.Value;
             }
             _data = "access_key=" + this.key + "&" + _data;
-            string _sign = System.Web.Security.FormsAuthentication.HashPasswordForStoringInConfigFile(_data + "&secret_key="+this.secret, "MD5").ToLower();
+            string _sign = System.Web.Security.FormsAuthentication.HashPasswordForStoringInConfigFile(_data + "&secret_key=" + this.secret, "MD5").ToLower();
             _data += "&sign=" + _sign;
 
             WebClientPlus _webClient = new WebClientPlus(this.timeout);
@@ -213,7 +389,6 @@ namespace HuobiAPI.Lib
 
             return _json;
         }
-        #endregion
         #endregion
     }
 }

@@ -48,6 +48,9 @@
     <Compile Include="Account.cs" />
     <Compile Include="Huobi.cs" />
     <Compile Include="HuobiException.cs" />
+    <Compile Include="KLine.cs" />
+    <Compile Include="Market.cs" />
+    <Compile Include="Line.cs" />
     <Compile Include="Order.cs" />
     <Compile Include="WebClientPlus.cs">
       <SubType>Component</SubType>
