@@ -190,10 +190,20 @@ namespace HuobiAPI.Lib
             for (int i = 0; i < _market.TopSells.Length; i++)
             {
                 MarketTrade5 _trade = new MarketTrade5();
-                _trade.Price = _json["top_sell"][i]["price"].Value<decimal>();
-                _trade.Level = _json["top_sell"][i]["level"].Value<decimal>();
-                _trade.Volume = _json["top_sell"][i]["amount"].Value<decimal>();
-                _trade.ACCU = _json["top_sell"][i]["accu"].Value<decimal>();
+                if (_type == MarketType.LTC)
+                {
+                    _trade.Price = _json["top_sell"][(4 - i).ToString()]["price"].Value<decimal>();
+                    _trade.Level = _json["top_sell"][(4 - i).ToString()]["level"].Value<decimal>();
+                    _trade.Volume = _json["top_sell"][(4 - i).ToString()]["amount"].Value<decimal>();
+                    _trade.ACCU = _json["top_sell"][(4 - i).ToString()]["accu"].Value<decimal>();
+                }
+                else
+                {
+                    _trade.Price = _json["top_sell"][i]["price"].Value<decimal>();
+                    _trade.Level = _json["top_sell"][i]["level"].Value<decimal>();
+                    _trade.Volume = _json["top_sell"][i]["amount"].Value<decimal>();
+                    _trade.ACCU = _json["top_sell"][i]["accu"].Value<decimal>();
+                }
                 _market.TopSells[i] = _trade;
             }
 
